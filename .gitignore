@@ -1,0 +1,82 @@
+.gitignore
+
+# Ignore everything by default, allow specific folders below
+/*
+
+# Keep git metadata and ignore file
+!/.gitignore
+
+# Keep these project folders and their contents
+!/src/
+!/src/**
+!/shaders/
+!/shaders/**
+!/textures/
+!/textures/**
+
+# Common dev files to ignore when present
+.vscode/
+.history/
+.idea/
+.vs/
+
+# Build directories
+build/
+out/
+bin/
+obj/
+
+# CMake files and artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+Makefile
+compile_commands.json
+rules.ninja
+build.ninja
+
+# Visual Studio
+*.sln
+*.vcxproj*
+*.suo
+*.user
+*.userosscache
+*.VC.db
+*.VC.opendb
+*.filters
+*.pdb
+*.ilk
+
+# Compiled object files and libraries
+*.obj
+*.o
+*.lib
+*.a
+*.so
+*.dll
+*.exe
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Generated shader binaries in build outputs
+/shaders/*.spv
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Misc
+*.iml
+.cache/
