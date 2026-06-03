@@ -12,6 +12,9 @@ namespace Engine
     public:
         void createSwapChain();
 
+        // Expose image view creation so other components can request it
+        void createImageViews();
+
         SwapChain(const vk::raii::PhysicalDevice &physicalDevice, const vk::raii::SurfaceKHR &surface, const vk::raii::Device &device, GlfwWindow &window);
         ~SwapChain();
         SwapChain(const SwapChain &) = delete;
@@ -41,6 +44,5 @@ namespace Engine
         vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
         vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
         uint32_t chooseSwapMinImageCount(const vk::SurfaceCapabilitiesKHR &capabilities);
-        void createImageViews();    
     };
 }

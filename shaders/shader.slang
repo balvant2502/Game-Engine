@@ -1,6 +1,6 @@
 
 struct VSInput {
-    [[vk::location(0)]] float2 inPosition;
+    [[vk::location(0)]] float3 inPosition;
     [[vk::location(1)]] float3 inColor;
 };
 
@@ -20,7 +20,7 @@ struct VSOutput
 [shader("vertex")]
 VSOutput vertMain(VSInput input) {
     VSOutput output;
-    output.pos = mul(ubo.proj, mul(ubo.view, mul(ubo.model, float4(input.inPosition, 0.0, 1.0))));
+    output.pos = mul(ubo.proj, mul(ubo.view, mul(ubo.model, float4(input.inPosition, 1.0))));
     output.color = input.inColor;
     return output;
 }

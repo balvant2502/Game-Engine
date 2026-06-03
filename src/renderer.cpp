@@ -4,20 +4,25 @@
 #include <stdexcept>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace Engine {
+namespace Engine
+{
 
-    Renderer::Renderer(Device &deviceObj, SwapChain &swapChain, GlfwWindow &window) : deviceObj{deviceObj}, swapChain{swapChain}, window{window}, device{deviceObj.getDevice()}, physicalDevice{deviceObj.getPhysicalDevice()}, surface{deviceObj.getSurface()} {
+    Renderer::Renderer(Device &deviceObj, SwapChain &swapChain, GlfwWindow &window) : deviceObj{deviceObj}, swapChain{swapChain}, window{window}, device{deviceObj.getDevice()}, physicalDevice{deviceObj.getPhysicalDevice()}, surface{deviceObj.getSurface()}
+    {
     }
 
-    void Renderer::init() {
-        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, swapChain.getExtent(), swapChain.getSurfaceFormat());
-        swapChainImageLayouts.assign(swapChain.getImages().size(), vk::ImageLayout::eUndefined);
+    void Renderer::init()
+    {
         createCommandPool();
+        createDepthResources();
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, swapChain.getExtent(), swapChain.getSurfaceFormat(), depthFormat);
+        swapChainImageLayouts.assign(swapChain.getImages().size(), vk::ImageLayout::eUndefined);
         texture = std::make_unique<Texture>(
             device,
             physicalDevice,
             commandPool,
             deviceObj.getQueue(),
+            *this,
             "textures/brick.jpg");
         createVertexBuffer();
         createIndexBuffer();
@@ -28,14 +33,16 @@ namespace Engine {
         createSyncObjects();
     }
 
-    void Renderer::createCommandPool() {
+    void Renderer::createCommandPool()
+    {
         vk::CommandPoolCreateInfo poolInfo{};
         poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
         poolInfo.queueFamilyIndex = deviceObj.getQueueIndex();
         commandPool = vk::raii::CommandPool(device, poolInfo);
     }
 
-    std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Renderer::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+    std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Renderer::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+    {
         vk::BufferCreateInfo bufferInfo{};
         bufferInfo.size = size;
         bufferInfo.usage = usage;
@@ -50,7 +57,8 @@ namespace Engine {
         return {std::move(buffer), std::move(bufferMemory)};
     }
 
-    void Renderer::createVertexBuffer() {
+    void Renderer::createVertexBuffer()
+    {
         vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
         auto [stagingBuffer, stagingBufferMemory] = createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         void *dataStaging = stagingBufferMemory.mapMemory(0, bufferSize);
@@ -60,7 +68,8 @@ namespace Engine {
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
     }
 
-    void Renderer::createIndexBuffer() {
+    void Renderer::createIndexBuffer()
+    {
         vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
         auto [stagingBuffer, stagingBufferMemory] = createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         void *data = stagingBufferMemory.mapMemory(0, bufferSize);
@@ -70,36 +79,49 @@ namespace Engine {
         copyBuffer(stagingBuffer, indexBuffer, bufferSize);
     }
 
-    void Renderer::createUniformBuffers() {
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    void Renderer::createUniformBuffers()
+    {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
             vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
-            auto [buffer, bufferMem] = createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-            uniformBuffers.emplace_back(std::move(buffer));
-            uniformBuffersMemory.emplace_back(std::move(bufferMem));
+
+            //for cube1 
+            auto [buffer1, bufferMem1] = createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            uniformBuffers.emplace_back(std::move(buffer1));
+            uniformBuffersMemory.emplace_back(std::move(bufferMem1));
+            uniformBuffersMapped.emplace_back(uniformBuffersMemory.back().mapMemory(0, bufferSize));
+
+            // for cube2
+            auto [buffer2, bufferMem2] = createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            uniformBuffers.emplace_back(std::move(buffer2));
+            uniformBuffersMemory.emplace_back(std::move(bufferMem2));
             uniformBuffersMapped.emplace_back(uniformBuffersMemory.back().mapMemory(0, bufferSize));
         }
     }
 
-    void Renderer::createDescriptorPool() {
+    void Renderer::createDescriptorPool()
+    {
         vk::DescriptorPoolSize poolSize{};
         poolSize.type = vk::DescriptorType::eUniformBuffer;
-        poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+        poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
         vk::DescriptorPoolCreateInfo poolInfo{};
         poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
-        poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+        poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 2;
         poolInfo.poolSizeCount = 1;
         poolInfo.pPoolSizes = &poolSize;
         descriptorPool = vk::raii::DescriptorPool(device, poolInfo);
     }
 
-    void Renderer::createDescriptorSets() {
-        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *graphicsPipeline->getDescriptorSetLayout());
+    void Renderer::createDescriptorSets()
+    {
+        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT * 2, *graphicsPipeline->getDescriptorSetLayout());
         vk::DescriptorSetAllocateInfo allocInfo{};
         allocInfo.descriptorPool = *descriptorPool;
-        allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+        allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT * 2;
         allocInfo.pSetLayouts = layouts.data();
         descriptorSets = vk::raii::DescriptorSets(device, allocInfo);
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT * 2; i++)
+        {
             vk::DescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = *uniformBuffers[i];
             bufferInfo.offset = 0;
@@ -116,7 +138,8 @@ namespace Engine {
         }
     }
 
-    void Renderer::createCommandBuffers() {
+    void Renderer::createCommandBuffers()
+    {
         commandBuffers.clear();
         vk::CommandBufferAllocateInfo allocInfo{};
         allocInfo.commandPool = commandPool;
@@ -125,7 +148,8 @@ namespace Engine {
         commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
     }
 
-    void Renderer::recordCommandBuffer(uint32_t imageIndex) {
+    void Renderer::recordCommandBuffer(uint32_t imageIndex)
+    {
         auto &commandBuffer = commandBuffers[frameIndex];
         vk::CommandBufferBeginInfo beginInfo{};
         commandBuffer.begin(beginInfo);
@@ -169,6 +193,19 @@ namespace Engine {
         renderingInfo.layerCount = 1;
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachments = &attachmentInfo;
+
+
+        // attach depth buffer
+        vk::RenderingAttachmentInfo depthAttachmentInfo{};
+        depthAttachmentInfo.imageView = *depthImageView;
+        depthAttachmentInfo.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+        depthAttachmentInfo.loadOp = vk::AttachmentLoadOp::eClear;
+        depthAttachmentInfo.storeOp = vk::AttachmentStoreOp::eStore;
+        vk::ClearValue depthClear{};
+        depthClear.depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
+        depthAttachmentInfo.clearValue = depthClear;
+        renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+
         commandBuffer.beginRendering(renderingInfo);
         commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline->getPipeline());
         vk::Viewport viewport{};
@@ -186,9 +223,17 @@ namespace Engine {
         commandBuffer.setScissor(0, scissor);
         commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
         commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexTypeValue<decltype(indices)::value_type>::value);
-        std::array<vk::DescriptorSet, 1> sets = {descriptorSets[frameIndex]};
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *graphicsPipeline->getPipelineLayout(), 0, sets, {});
+
+        // draw cube1
+        std::array<vk::DescriptorSet, 1> sets1 = {descriptorSets[frameIndex * 2]};
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *graphicsPipeline->getPipelineLayout(), 0, sets1, {});
         commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+        // draw cube2
+        std::array<vk::DescriptorSet, 1> sets2 = {descriptorSets[frameIndex * 2 + 1]};
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *graphicsPipeline->getPipelineLayout(), 0, sets2, {});
+        commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
         commandBuffer.endRendering();
 
         vk::ImageMemoryBarrier imageToPresentBarrier{};
@@ -204,6 +249,8 @@ namespace Engine {
         imageToPresentBarrier.subresourceRange.levelCount = 1;
         imageToPresentBarrier.subresourceRange.baseArrayLayer = 0;
         imageToPresentBarrier.subresourceRange.layerCount = 1;
+
+
         std::array<vk::ImageMemoryBarrier, 1> imageToPresentBarriers = {imageToPresentBarrier};
         commandBuffer.pipelineBarrier(
             vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -217,13 +264,16 @@ namespace Engine {
         commandBuffer.end();
     }
 
-    void Renderer::createSyncObjects() {
+    void Renderer::createSyncObjects()
+    {
         assert(presentCompleteSemaphores.empty() && renderFinishedSemaphores.empty() && inFlightFences.empty());
-        for (size_t i = 0; i < swapChain.getImages().size(); i++) {
+        for (size_t i = 0; i < swapChain.getImages().size(); i++)
+        {
             vk::SemaphoreCreateInfo semaphoreInfo{};
             renderFinishedSemaphores.emplace_back(device, semaphoreInfo);
         }
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
             vk::SemaphoreCreateInfo semaphoreInfo{};
             presentCompleteSemaphores.emplace_back(device, semaphoreInfo);
             vk::FenceCreateInfo fenceInfo{};
@@ -232,29 +282,71 @@ namespace Engine {
         }
     }
 
-    void Renderer::updateUniformBuffer(uint32_t currentImage) {
+    void Renderer::updateUniformBuffer(uint32_t currentImage)
+    {
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float>(currentTime - startTime).count();
-        UniformBufferObject ubo{};
-        ubo.model = rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChain.getExtent().width) / static_cast<float>(swapChain.getExtent().height), 0.1f, 10.0f);
-        ubo.proj[1][1] *= -1;
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+
+        // CUBE 1
+        UniformBufferObject ubo1{};
+        // Rotate over time (radians). Use distinct axis angles and apply time as the angle multiplier.
+        float angleX = time * glm::radians(45.0f);
+        float angleY = time * glm::radians(45.0f);
+        float angleZ = time * glm::radians(45.0f);
+
+        glm::mat4 rotX1 = glm::rotate(glm::mat4(1.0f), angleX, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::mat4 rotY1 = glm::rotate(glm::mat4(1.0f), angleY, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 rotZ1 = glm::rotate(glm::mat4(1.0f), angleZ, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        glm::mat4 rotationMatrix = rotZ1 * rotY1 * rotX1;
+        glm::mat4 translation1 = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
+        ubo1.model = translation1 * rotationMatrix;
+
+        // CUBE 2 - position to the right, rotates differently
+        UniformBufferObject ubo2{};
+        float angleX2 = time * glm::radians(30.0f);
+        float angleY2 = time * glm::radians(90.0f);
+        float angleZ2 = time * glm::radians(45.0f);
+
+        glm::mat4 rotX2 = glm::rotate(glm::mat4(1.0f), angleX2, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::mat4 rotY2 = glm::rotate(glm::mat4(1.0f), angleY2, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 rotZ2 = glm::rotate(glm::mat4(1.0f), angleZ2, glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 rotationMatrix2 = rotZ2 * rotY2 * rotX2;
+
+        glm::mat4 translation2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // Move right
+        ubo2.model = translation2 * rotationMatrix2;
+
+        glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChain.getExtent().width) / static_cast<float>(swapChain.getExtent().height), 0.1f, 10.0f);
+        proj[1][1] *= -1;
+
+        ubo1.view = view;
+        ubo2.view = view;
+        ubo1.proj = proj;
+        ubo2.proj = proj;
+
+        void* mapped1 = uniformBuffersMapped[currentImage * 2];
+        void* mapped2 = uniformBuffersMapped[currentImage * 2 + 1];
+        memcpy(mapped1, &ubo1, sizeof(ubo1));
+        memcpy(mapped2, &ubo2, sizeof(ubo2));
     }
 
-    void Renderer::drawFrame() {
+    void Renderer::drawFrame()
+    {
         auto fenceResult = device.waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
-        if (fenceResult != vk::Result::eSuccess) {
+        if (fenceResult != vk::Result::eSuccess)
+        {
             throw std::runtime_error("failed to wait for fence!");
         }
         auto [result, imageIndex] = swapChain.getSwapchain().acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
-        if (result == vk::Result::eErrorOutOfDateKHR) {
+        if (result == vk::Result::eErrorOutOfDateKHR)
+        {
             recreateSwapChain();
             return;
         }
-        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+        {
             assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
             throw std::runtime_error("failed to acquire swap chain image!");
         }
@@ -279,16 +371,19 @@ namespace Engine {
         presentInfoKHR.pSwapchains = &*swapChain.getSwapchain();
         presentInfoKHR.pImageIndices = &imageIndex;
         result = deviceObj.getQueue().presentKHR(presentInfoKHR);
-        if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR)) {
+        if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR))
+        {
             recreateSwapChain();
         }
         frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void Renderer::recreateSwapChain() {
+    void Renderer::recreateSwapChain()
+    {
         int width = 0, height = 0;
         glfwGetFramebufferSize(window.getWindow(), &width, &height);
-        while (width == 0 || height == 0) {
+        while (width == 0 || height == 0)
+        {
             glfwGetFramebufferSize(window.getWindow(), &width, &height);
             glfwWaitEvents();
         }
@@ -296,16 +391,20 @@ namespace Engine {
         // recreate swap chain
         swapChain.createSwapChain();
         swapChainImageLayouts.assign(swapChain.getImages().size(), vk::ImageLayout::eUndefined);
+        // recreate depth resources for new extent
+        createDepthResources();
         // re-create pipeline
-        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, swapChain.getExtent(), swapChain.getSurfaceFormat());
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, swapChain.getExtent(), swapChain.getSurfaceFormat(), depthFormat);
         createCommandBuffers();
     }
 
-    void Renderer::cleanup() {
+    void Renderer::cleanup()
+    {
         // resources will be freed by RAII members
     }
 
-    void Renderer::copyBuffer(vk::raii::Buffer &srcBuffer, vk::raii::Buffer &dstBuffer, vk::DeviceSize size) {
+    void Renderer::copyBuffer(vk::raii::Buffer &srcBuffer, vk::raii::Buffer &dstBuffer, vk::DeviceSize size)
+    {
         vk::raii::CommandBuffer commandCopyBuffer = beginSingleTimeCommands();
         vk::BufferCopy copyRegion{};
         copyRegion.size = size;
@@ -313,7 +412,79 @@ namespace Engine {
         endSingleTimeCommands(std::move(commandCopyBuffer));
     }
 
-    vk::raii::CommandBuffer Renderer::beginSingleTimeCommands() {
+    vk::Format Renderer::findDepthFormat()
+    {
+        std::vector<vk::Format> candidates = {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint};
+        for (auto format : candidates)
+        {
+            vk::FormatProperties props = physicalDevice.getFormatProperties(format);
+            if ((props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) == vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+            {
+                return format;
+            }
+        }
+        throw std::runtime_error("failed to find supported depth format!");
+    }
+
+    void Renderer::createDepthResources()
+    {
+        depthFormat = findDepthFormat();
+        vk::ImageCreateInfo imageInfo{};
+        imageInfo.imageType = vk::ImageType::e2D;
+        imageInfo.extent.width = swapChain.getExtent().width;
+        imageInfo.extent.height = swapChain.getExtent().height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = depthFormat;
+        imageInfo.tiling = vk::ImageTiling::eOptimal;
+        imageInfo.initialLayout = vk::ImageLayout::eUndefined;
+        imageInfo.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+        imageInfo.samples = vk::SampleCountFlagBits::e1;
+        imageInfo.sharingMode = vk::SharingMode::eExclusive;
+
+        depthImage = vk::raii::Image(device, imageInfo);
+
+        vk::MemoryRequirements memRequirements = depthImage.getMemoryRequirements();
+        vk::MemoryAllocateInfo allocInfo{};
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        depthImageMemory = vk::raii::DeviceMemory(device, allocInfo);
+        depthImage.bindMemory(*depthImageMemory, 0);
+
+        vk::ImageViewCreateInfo viewInfo{};
+        viewInfo.image = *depthImage;
+        viewInfo.viewType = vk::ImageViewType::e2D;
+        viewInfo.format = depthFormat;
+        viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+        depthImageView = vk::raii::ImageView(device, viewInfo);
+
+        // Transition layout to depth attachment optimal
+        vk::raii::CommandBuffer cmd = beginSingleTimeCommands();
+        vk::ImageMemoryBarrier barrier{};
+        barrier.oldLayout = vk::ImageLayout::eUndefined;
+        barrier.newLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = *depthImage;
+        barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = {};
+        barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eEarlyFragmentTests, {}, nullptr, nullptr, {barrier});
+        endSingleTimeCommands(std::move(cmd));
+    }
+
+    vk::raii::CommandBuffer Renderer::beginSingleTimeCommands()
+    {
         vk::CommandBufferAllocateInfo allocInfo{};
         allocInfo.commandPool = commandPool;
         allocInfo.level = vk::CommandBufferLevel::ePrimary;
@@ -325,7 +496,8 @@ namespace Engine {
         return std::move(commandBuffer);
     }
 
-    void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer &&commandBuffer) {
+    void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer &&commandBuffer)
+    {
         commandBuffer.end();
         vk::SubmitInfo submitInfo{};
         submitInfo.commandBufferCount = 1;
@@ -334,10 +506,13 @@ namespace Engine {
         deviceObj.getQueue().waitIdle();
     }
 
-    uint32_t Renderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+    uint32_t Renderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+    {
         vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
-        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+        {
+            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+            {
                 return i;
             }
         }

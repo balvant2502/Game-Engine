@@ -6,7 +6,7 @@
 namespace Engine{
     class GraphicsPipeline {
         public:
-            GraphicsPipeline(const vk::raii::Device &device, const vk::Extent2D &swapChainExtent, const vk::SurfaceFormatKHR &surfaceFormat);
+            GraphicsPipeline(const vk::raii::Device &device, const vk::Extent2D &swapChainExtent, const vk::SurfaceFormatKHR &surfaceFormat, vk::Format depthFormat);
             ~GraphicsPipeline() = default;
             GraphicsPipeline(const GraphicsPipeline &) = delete;
             GraphicsPipeline &operator=(const GraphicsPipeline &) = delete;
@@ -21,6 +21,7 @@ namespace Engine{
             const vk::raii::Device &device;
             const vk::Extent2D &swapChainExtent;
             const vk::SurfaceFormatKHR swapChainSurfaceFormat;
+            const vk::Format depthAttachmentFormat;
             // no render pass required (using dynamic rendering)
             
             vk::raii::PipelineLayout pipelineLayout = nullptr;

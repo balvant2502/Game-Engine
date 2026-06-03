@@ -15,6 +15,9 @@ namespace Engine {
         ~Renderer() = default;
         Renderer(const Renderer&) = delete;
         Renderer& operator=(const Renderer&) = delete;
+
+        friend class Texture;
+
         void init();
         void drawFrame();
         void recreateSwapChain();
@@ -40,6 +43,8 @@ namespace Engine {
         std::vector<vk::raii::Buffer> uniformBuffers;
         std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
         std::vector<void*> uniformBuffersMapped;
+        // for multiple cubes
+        std::vector<std::unique_ptr<UniformBufferObject>> cubeTransforms;  // Store transforms for each cube
 
         vk::raii::DescriptorPool descriptorPool = nullptr;
         vk::raii::DescriptorSets descriptorSets = nullptr;
@@ -51,6 +56,15 @@ namespace Engine {
         uint32_t frameIndex = 0;
 
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
+        // Depth resources
+        vk::raii::Image depthImage = nullptr;
+        vk::raii::DeviceMemory depthImageMemory = nullptr;
+        vk::raii::ImageView depthImageView = nullptr;
+
+        vk::Format depthFormat = vk::Format::eD32Sfloat;
+
+        void createDepthResources();
+        vk::Format findDepthFormat();
 
         void createCommandPool();
         void createVertexBuffer();

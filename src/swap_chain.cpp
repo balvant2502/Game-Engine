@@ -83,7 +83,10 @@ namespace Engine {
 	}
 
 	void SwapChain::createImageViews() {
-		assert(swapChainImageViews.empty());
+		// If recreating the swapchain, existing image views must be released first.
+		if (!swapChainImageViews.empty()) {
+			swapChainImageViews.clear();
+		}
 
 		vk::ImageViewCreateInfo imageViewCreateInfo{};
 		imageViewCreateInfo.viewType = vk::ImageViewType::e2D;

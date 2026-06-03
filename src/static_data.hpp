@@ -4,7 +4,7 @@
 
 struct Vertex
 {
-	glm::vec2 pos;
+	glm::vec3 pos;
 	glm::vec3 color;
 
 	static vk::VertexInputBindingDescription getBindingDescription()
@@ -18,10 +18,10 @@ struct Vertex
 
 	static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
 	{
-      vk::VertexInputAttributeDescription desc1{};
+	  vk::VertexInputAttributeDescription desc1{};
 		desc1.location = 0;
 		desc1.binding = 0;
-		desc1.format = vk::Format::eR32G32Sfloat;
+		desc1.format = vk::Format::eR32G32B32Sfloat;
 		desc1.offset = offsetof(Vertex, pos);
 		vk::VertexInputAttributeDescription desc2{};
 		desc2.location = 1;
@@ -42,10 +42,54 @@ struct UniformBufferObject
 
 inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-inline const std::vector<Vertex> vertices = {
-	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}} };
+// inline const std::vector<Vertex> vertices = {
+// 	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+// 	{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+// 	{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
+// 	{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+// Cube vertices (positions and colors). 8 unique corners.
 
-inline const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+inline const std::vector<Vertex> vertices = {
+	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0  0 (back - red)
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 0  1 (left - blue)
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}}, // 0  2 (bottom - cyan)
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 1  3 (back - red)
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 1  4 (right - yellow)
+	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}}, // 1  5 (bottom - cyan)
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 2  6 (back - red)
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 2  7 (right - yellow)
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 2  8 (top - magenta)
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 3  9 (back - red)
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 3  10 (left - blue)
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 3  11 (top - magenta)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, // 4  12 (front - green)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // 4  13 (left - blue)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 4  14 (bottom - cyan)
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, // 5  15 (front - green)
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 5  16 (right - yellow)
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5  17 (bottom - cyan)
+	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, // 6  18 (front - green)
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 6  19 (right - yellow)
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 6  20 (top - magenta)
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},  // 7 21 (front - green)
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},  // 7 22 (left - blue)
+	{{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}  // 7  23 (top - magenta)
+};
+
+// 36 indices: 6 faces * 2 triangles * 3 indices
+inline const std::vector<uint16_t> indices = {
+	// back face (z = -0.5)
+	0, 3, 6, 6, 9, 0,
+	// front face (z = +0.5)
+	12, 15, 18, 18, 21, 12,
+	// left face (x = -0.5)
+	1, 10, 22, 22, 13, 1,
+	// right face (x = +0.5)
+	4, 16, 19, 19, 7, 4,
+	// top face (y = +0.5)
+	11, 8, 20, 20, 23, 11,
+	// bottom face (y = -0.5)
+	2, 14, 17, 17, 5, 2
+};
+
+// inline const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};

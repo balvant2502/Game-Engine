@@ -2,7 +2,7 @@
 #include "file_utils.hpp"
 
 namespace Engine {
-	GraphicsPipeline::GraphicsPipeline(const vk::raii::Device &device, const vk::Extent2D &swapChainExtent, const vk::SurfaceFormatKHR &surfaceFormat) : device{device}, swapChainExtent{swapChainExtent}, swapChainSurfaceFormat{surfaceFormat} {
+	GraphicsPipeline::GraphicsPipeline(const vk::raii::Device &device, const vk::Extent2D &swapChainExtent, const vk::SurfaceFormatKHR &surfaceFormat, vk::Format depthFormat) : device{device}, swapChainExtent{swapChainExtent}, swapChainSurfaceFormat{surfaceFormat}, depthAttachmentFormat{depthFormat} {
         createPipeline();
     }
 
@@ -65,6 +65,7 @@ namespace Engine {
 		rasterizer.depthClampEnable = VK_FALSE;
 		rasterizer.rasterizerDiscardEnable = VK_FALSE;
 		rasterizer.polygonMode = vk::PolygonMode::eFill;
+		// Enable back-face culling so only faces facing the camera are drawn
 		rasterizer.cullMode = vk::CullModeFlagBits::eNone;
 		rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
 		rasterizer.depthBiasEnable = VK_FALSE;
@@ -103,6 +104,15 @@ namespace Engine {
 		graphicsPipelineCreateInfo.pRasterizationState = &rasterizer;
 		graphicsPipelineCreateInfo.pMultisampleState = &multisampling;
 		graphicsPipelineCreateInfo.pColorBlendState = &colorBlending;
+
+		// Enable depth/stencil state
+		vk::PipelineDepthStencilStateCreateInfo depthStencil{};
+		depthStencil.depthTestEnable = VK_TRUE;
+		depthStencil.depthWriteEnable = VK_TRUE;
+		depthStencil.depthCompareOp = vk::CompareOp::eLess;
+		depthStencil.depthBoundsTestEnable = VK_FALSE;
+		depthStencil.stencilTestEnable = VK_FALSE;
+		graphicsPipelineCreateInfo.pDepthStencilState = &depthStencil;
 		graphicsPipelineCreateInfo.pDynamicState = &dynamicState;
 		graphicsPipelineCreateInfo.layout = pipelineLayout;
 		graphicsPipelineCreateInfo.renderPass = nullptr;
@@ -110,6 +120,8 @@ namespace Engine {
 		vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChainSurfaceFormat.format;
+		// Set a depth attachment format so dynamic rendering can use a depth buffer
+		pipelineRenderingCreateInfo.depthAttachmentFormat = depthAttachmentFormat;
 
 		vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain = {
 			graphicsPipelineCreateInfo,
