@@ -7,6 +7,7 @@
 #include "static_data.hpp"
 #include "file_utils.hpp"
 #include <vector>
+#include "camera.hpp"
 
 namespace Engine {
     class Renderer {
@@ -22,6 +23,7 @@ namespace Engine {
         void drawFrame();
         void recreateSwapChain();
         void cleanup();
+        Camera* getCamera() { return &camera; }
 
     private:
         Device &deviceObj;
@@ -56,6 +58,7 @@ namespace Engine {
         uint32_t frameIndex = 0;
 
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
+        Camera camera;
         // Depth resources
         vk::raii::Image depthImage = nullptr;
         vk::raii::DeviceMemory depthImageMemory = nullptr;
@@ -67,6 +70,7 @@ namespace Engine {
         vk::Format findDepthFormat();
 
         void createCommandPool();
+        
         void createVertexBuffer();
         void createIndexBuffer();
         void createUniformBuffers();

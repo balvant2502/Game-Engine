@@ -6,6 +6,8 @@ struct Vertex
 {
 	glm::vec3 pos;
 	glm::vec3 color;
+	glm::vec2 uv;
+	
 
 	static vk::VertexInputBindingDescription getBindingDescription()
 	{
@@ -16,21 +18,26 @@ struct Vertex
 		return desc;
 	}
 
-	static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
-	{
-	  vk::VertexInputAttributeDescription desc1{};
-		desc1.location = 0;
-		desc1.binding = 0;
-		desc1.format = vk::Format::eR32G32B32Sfloat;
-		desc1.offset = offsetof(Vertex, pos);
-		vk::VertexInputAttributeDescription desc2{};
-		desc2.location = 1;
-		desc2.binding = 0;
-		desc2.format = vk::Format::eR32G32B32Sfloat;
-		desc2.offset = offsetof(Vertex, color);
-		std::array<vk::VertexInputAttributeDescription, 2> desc = { desc1, desc2 };
-		return desc;
-	}
+		static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions()
+		{
+			vk::VertexInputAttributeDescription desc1{};
+				desc1.location = 0;
+				desc1.binding = 0;
+				desc1.format = vk::Format::eR32G32B32Sfloat;
+				desc1.offset = offsetof(Vertex, pos);
+				vk::VertexInputAttributeDescription desc2{};
+				desc2.location = 1;
+				desc2.binding = 0;
+				desc2.format = vk::Format::eR32G32B32Sfloat;
+				desc2.offset = offsetof(Vertex, color);
+				vk::VertexInputAttributeDescription desc3{};
+				desc3.location = 2;
+				desc3.binding = 0;
+				desc3.format = vk::Format::eR32G32Sfloat;
+				desc3.offset = offsetof(Vertex, uv);
+				std::array<vk::VertexInputAttributeDescription, 3> desc = { desc1, desc2, desc3 };
+				return desc;
+		}
 };
 
 struct UniformBufferObject
@@ -42,41 +49,35 @@ struct UniformBufferObject
 
 inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-// inline const std::vector<Vertex> vertices = {
-// 	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-// 	{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-// 	{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
-// 	{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-// Cube vertices (positions and colors). 8 unique corners.
+
 
 inline const std::vector<Vertex> vertices = {
-	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 0  0 (back - red)
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 0  1 (left - blue)
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}}, // 0  2 (bottom - cyan)
-	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 1  3 (back - red)
-	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 1  4 (right - yellow)
-	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}}, // 1  5 (bottom - cyan)
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 2  6 (back - red)
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}}, // 2  7 (right - yellow)
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 2  8 (top - magenta)
-	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // 3  9 (back - red)
-	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}}, // 3  10 (left - blue)
-	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}}, // 3  11 (top - magenta)
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, // 4  12 (front - green)
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // 4  13 (left - blue)
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 4  14 (bottom - cyan)
-	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, // 5  15 (front - green)
-	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 5  16 (right - yellow)
-	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}}, // 5  17 (bottom - cyan)
-	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}}, // 6  18 (front - green)
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // 6  19 (right - yellow)
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}, // 6  20 (top - magenta)
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}},  // 7 21 (front - green)
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},  // 7 22 (left - blue)
-	{{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}}  // 7  23 (top - magenta)
+	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 0  0 (back - red)
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // 1  1 (left - blue)
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}, // 2  2 (bottom - cyan)
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 3  3 (back - red)
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // 4  4 (right - yellow)
+	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}, // 5  5 (bottom - cyan)
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 6  6 (back - red)
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // 7  7 (right - yellow)
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}, // 8  8 (top - magenta)
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 9  9 (back - red)
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}, // 10 10 (left - blue)
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // 11 11 (top - magenta)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // 12 12 (front - green)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // 13 13 (left - blue)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}, {1.0f, 0.0f}}, // 14 14 (bottom - cyan)
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}, // 15 15 (front - green)
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}, // 16 16 (right - yellow)
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}, // 17 17 (bottom - cyan)
+	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}, // 18 18 (front - green)
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}, // 19 19 (right - yellow)
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 20 20 (top - magenta)
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},  // 21 21 (front - green)
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},  // 22 22 (left - blue)
+	{{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}  // 23  23 (top - magenta)
 };
 
-// 36 indices: 6 faces * 2 triangles * 3 indices
 inline const std::vector<uint16_t> indices = {
 	// back face (z = -0.5)
 	0, 3, 6, 6, 9, 0,
@@ -92,4 +93,3 @@ inline const std::vector<uint16_t> indices = {
 	2, 14, 17, 17, 5, 2
 };
 
-// inline const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};

@@ -3,9 +3,12 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include <string>
+#include <vector>
 
 namespace Engine {
+
     class Renderer;
+    
 
     class Texture {
     public:
@@ -24,13 +27,16 @@ namespace Engine {
         const vk::raii::Image& getImage() const;
         const vk::raii::DeviceMemory& getMemory() const;
         const vk::raii::ImageView& getTextureImageView() const;
+        const vk::raii::Sampler& getTextureSampler() const;
         void createTextureImageView();
-        void createTexxtureSampler();
+        void createTextureSampler();
 
     private:
         vk::raii::Image image = nullptr;
         vk::raii::DeviceMemory memory = nullptr;
         vk::raii::ImageView textureImageView = nullptr;
+        // References to swapchain image views (owned by SwapChain)
+        std::vector<const vk::raii::ImageView*> swapChainImageViews;
         
         // Keep references to Vulkan objects needed by helper methods
         const vk::raii::Device& device;
@@ -45,6 +51,7 @@ namespace Engine {
         int texChannels = 0;
         vk::DeviceSize imageSize = 0;
         vk::Format imageFormat = vk::Format::eR8G8B8A8Srgb;
+        vk::raii::Sampler textureSampler = nullptr;
         
 
         // Helper methods (previously file-level static functions)
@@ -75,6 +82,7 @@ namespace Engine {
             uint32_t height);
 
         vk::raii::ImageView createImageView(const vk::raii::Image &image, vk::Format imageFormat);
-    
+        void createImageViews();
+        
     };
 }

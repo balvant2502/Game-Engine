@@ -59,7 +59,8 @@ namespace Engine
         image = std::move(createdImage);
         memory = std::move(createdMemory);
         // create the view for shader access
-            createTextureImageView();
+        createTextureImageView();
+        createTextureSampler();
     }
 
     const vk::raii::Image &Texture::getImage() const
@@ -75,6 +76,10 @@ namespace Engine
     const vk::raii::ImageView &Texture::getTextureImageView() const
     {
         return textureImageView;
+    }
+
+    const vk::raii::Sampler &Texture::getTextureSampler() const {
+        return textureSampler;
     }
 
     uint32_t Texture::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const
@@ -208,7 +213,7 @@ namespace Engine
     vk::raii::ImageView Texture::createImageView(const vk::raii::Image &image, vk::Format imageFormat)
     {
         vk::ImageViewCreateInfo viewInfo{};
-        viewInfo.image = image;
+        viewInfo.image = *image;
         viewInfo.viewType = vk::ImageViewType::e2D;
         viewInfo.format = imageFormat;
         viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
@@ -220,10 +225,43 @@ namespace Engine
         return vk::raii::ImageView(device, viewInfo);
     }
 
-    
+    void Texture::createImageViews()
+    {
+        // Store non-owning pointers to the SwapChain's image views (owned by SwapChain).
+        const auto &swapViews = renderer.swapChain.getImageViews();
+        swapChainImageViews.clear();
+        swapChainImageViews.reserve(swapViews.size());
+        for (const auto &iv : swapViews)
+        {
+            swapChainImageViews.push_back(&iv);
+        }
+    }
 
     void Texture::createTextureImageView()
     {
         textureImageView = createImageView(image, vk::Format::eR8G8B8A8Srgb);
+    }
+
+    void Texture::createTextureSampler()
+    {
+        vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
+        vk::SamplerCreateInfo samplerInfo{};
+        samplerInfo.magFilter = vk::Filter::eLinear;
+        samplerInfo.minFilter = vk::Filter::eLinear;
+        samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
+        samplerInfo.addressModeU = vk::SamplerAddressMode::eRepeat;
+        samplerInfo.addressModeV = vk::SamplerAddressMode::eRepeat;
+        samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
+        samplerInfo.anisotropyEnable = vk::True;
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.compareEnable = vk::False;
+        samplerInfo.compareOp = vk::CompareOp::eAlways;
+        samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
+        samplerInfo.unnormalizedCoordinates = vk::False;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        textureSampler = vk::raii::Sampler(device, samplerInfo);
     }
 }

@@ -24,6 +24,8 @@ namespace Engine
             deviceObj.getQueue(),
             *this,
             "textures/brick.jpg");
+        // Populate texture references to the current swapchain image views
+        
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -101,14 +103,21 @@ namespace Engine
 
     void Renderer::createDescriptorPool()
     {
-        vk::DescriptorPoolSize poolSize{};
-        poolSize.type = vk::DescriptorType::eUniformBuffer;
-        poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
+        vk::DescriptorPoolSize poolSize1{};
+        poolSize1.type = vk::DescriptorType::eUniformBuffer;
+        poolSize1.descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
+
+        vk::DescriptorPoolSize poolSize2{};
+        poolSize2.type = vk::DescriptorType::eCombinedImageSampler;
+        poolSize2.descriptorCount =  MAX_FRAMES_IN_FLIGHT * 2;
+
+        std::array<vk::DescriptorPoolSize, 2> poolSize = {poolSize1, poolSize2};
+
         vk::DescriptorPoolCreateInfo poolInfo{};
         poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
         poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 2;
-        poolInfo.poolSizeCount = 1;
-        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSize.size());
+        poolInfo.pPoolSizes = poolSize.data();
         descriptorPool = vk::raii::DescriptorPool(device, poolInfo);
     }
 
@@ -126,14 +135,32 @@ namespace Engine
             bufferInfo.buffer = *uniformBuffers[i];
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
-            vk::WriteDescriptorSet descriptorWrite{};
-            descriptorWrite.dstSet = descriptorSets[i];
-            descriptorWrite.dstBinding = 0;
-            descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
-            descriptorWrite.descriptorCount = 1;
-            descriptorWrite.pBufferInfo = &bufferInfo;
-            std::array<vk::WriteDescriptorSet, 1> writes = {descriptorWrite};
+
+            vk::DescriptorImageInfo imageInfo {};
+            imageInfo.sampler = texture->getTextureSampler();
+            imageInfo.imageView = texture->getTextureImageView();
+            imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; 
+
+
+            vk::WriteDescriptorSet descriptorWrite1{};
+            descriptorWrite1.dstSet = descriptorSets[i];
+            descriptorWrite1.dstBinding = 0;
+            descriptorWrite1.dstArrayElement = 0;
+            descriptorWrite1.descriptorType = vk::DescriptorType::eUniformBuffer;
+            descriptorWrite1.descriptorCount = 1;
+            descriptorWrite1.pBufferInfo = &bufferInfo;
+
+            vk::WriteDescriptorSet descriptorWrite2{};
+            descriptorWrite2.dstSet = descriptorSets[i];
+            descriptorWrite2.dstBinding = 1;
+            descriptorWrite2.dstArrayElement = 0;
+            descriptorWrite2.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+            descriptorWrite2.descriptorCount = 1;
+            descriptorWrite2.pImageInfo = &imageInfo;
+
+            std::array<vk::WriteDescriptorSet, 2> writes = {descriptorWrite1, descriptorWrite2};
+
+
             device.updateDescriptorSets(writes, nullptr);
         }
     }
@@ -299,26 +326,28 @@ namespace Engine
         glm::mat4 rotY1 = glm::rotate(glm::mat4(1.0f), angleY, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 rotZ1 = glm::rotate(glm::mat4(1.0f), angleZ, glm::vec3(0.0f, 0.0f, 1.0f));
 
-        glm::mat4 rotationMatrix = rotZ1 * rotY1 * rotX1;
+        glm::mat4 rotationMatrix = rotY1 * rotZ1 * rotX1;
         glm::mat4 translation1 = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
         ubo1.model = translation1 * rotationMatrix;
 
         // CUBE 2 - position to the right, rotates differently
         UniformBufferObject ubo2{};
-        float angleX2 = time * glm::radians(30.0f);
-        float angleY2 = time * glm::radians(90.0f);
+        float angleX2 = time * glm::radians(45.0f);
+        float angleY2 = time * glm::radians(45.0f);
         float angleZ2 = time * glm::radians(45.0f);
 
         glm::mat4 rotX2 = glm::rotate(glm::mat4(1.0f), angleX2, glm::vec3(1.0f, 0.0f, 0.0f));
         glm::mat4 rotY2 = glm::rotate(glm::mat4(1.0f), angleY2, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 rotZ2 = glm::rotate(glm::mat4(1.0f), angleZ2, glm::vec3(0.0f, 0.0f, 1.0f));
-        glm::mat4 rotationMatrix2 = rotZ2 * rotY2 * rotX2;
+        glm::mat4 rotationMatrix2 = rotY2 * rotZ2 * rotX2;
 
         glm::mat4 translation2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // Move right
         ubo2.model = translation2 * rotationMatrix2;
 
-        glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChain.getExtent().width) / static_cast<float>(swapChain.getExtent().height), 0.1f, 10.0f);
+        // Obtain view/projection from the free camera
+        glm::mat4 view = camera.getViewMatrix();
+        glm::mat4 proj = camera.getProjectionMatrix(static_cast<float>(swapChain.getExtent().width) / static_cast<float>(swapChain.getExtent().height), 0.1f, 10.0f);
+        // GLM's perspective is defined for OpenGL; invert Y for Vulkan NDC
         proj[1][1] *= -1;
 
         ubo1.view = view;
@@ -390,6 +419,8 @@ namespace Engine
         device.waitIdle();
         // recreate swap chain
         swapChain.createSwapChain();
+        // Update texture references to new swapchain image views
+        
         swapChainImageLayouts.assign(swapChain.getImages().size(), vk::ImageLayout::eUndefined);
         // recreate depth resources for new extent
         createDepthResources();

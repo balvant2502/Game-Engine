@@ -22,14 +22,25 @@ namespace Engine {
     }
 
     void GraphicsPipeline::createDescriptorSetLayout() {
-        vk::DescriptorSetLayoutBinding uboLayoutBinding{};
-		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
-		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eVertex;
+		
+        vk::DescriptorSetLayoutBinding uboLayoutBinding1{};
+		uboLayoutBinding1.binding = 0;
+		uboLayoutBinding1.descriptorType = vk::DescriptorType::eUniformBuffer;
+		uboLayoutBinding1.descriptorCount = 1;
+		uboLayoutBinding1.stageFlags = vk::ShaderStageFlagBits::eVertex;
+
+		vk::DescriptorSetLayoutBinding uboLayoutBinding2 {};
+		uboLayoutBinding2.binding = 1;
+		uboLayoutBinding2.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+		uboLayoutBinding2.descriptorCount = 1;
+		uboLayoutBinding2.stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+		std::array<vk::DescriptorSetLayoutBinding, 2> bindings {
+			uboLayoutBinding1, uboLayoutBinding2
+		};
 		vk::DescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &uboLayoutBinding;
+		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+		layoutInfo.pBindings = bindings.data();
 		descriptorSetLayout = vk::raii::DescriptorSetLayout(device, layoutInfo);
     }
 
