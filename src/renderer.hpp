@@ -9,7 +9,13 @@
 #include <vector>
 #include "camera.hpp"
 
+
+
+
 namespace Engine {
+    const std::string  MODEL_PATH           = "models/viking_room.obj";
+    const std::string  TEXTURE_PATH         = "textures/viking_room.png";
+
     class Renderer {
     public:
         Renderer(Device &deviceObj, SwapChain &swapChain, GlfwWindow &window);
@@ -66,6 +72,10 @@ namespace Engine {
 
         vk::Format depthFormat = vk::Format::eD32Sfloat;
 
+        // loading models
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+
         void createDepthResources();
         vk::Format findDepthFormat();
 
@@ -80,6 +90,8 @@ namespace Engine {
         void recordCommandBuffer(uint32_t imageIndex);
         void createSyncObjects();
         void updateUniformBuffer(uint32_t currentImage);
+        void loadModel();
+        
 
         std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
         void copyBuffer(vk::raii::Buffer &srcBuffer, vk::raii::Buffer &dstBuffer, vk::DeviceSize size);

@@ -33,7 +33,7 @@ class Camera {
     public:
     Camera(
         glm::vec3 position = glm::vec3(2.0f, 2.0f, 2.0f),  // start slightly away from origin
-        glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f),        // Z-axis as world up for this project
+        glm::vec3 up = glm::vec3(0.0f, 0.0f, -1.0f),        // Z-axis as world up for this project
         float yaw = -135.0f,                                // angled toward origin from (2,2,2)
         float pitch = -35.26438968f                         // approximate pitch to look toward origin
     );

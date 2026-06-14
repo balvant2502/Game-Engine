@@ -1,8 +1,12 @@
-#include "renderer.hpp"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 #include <chrono>
 #include <cstring>
 #include <stdexcept>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include "renderer.hpp"
 
 namespace Engine
 {
@@ -23,9 +27,10 @@ namespace Engine
             commandPool,
             deviceObj.getQueue(),
             *this,
-            "textures/brick.jpg");
+            TEXTURE_PATH.c_str());
         // Populate texture references to the current swapchain image views
-        
+        // for loading models
+        loadModel();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -87,7 +92,7 @@ namespace Engine
         {
             vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 
-            //for cube1 
+            // for cube1
             auto [buffer1, bufferMem1] = createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
             uniformBuffers.emplace_back(std::move(buffer1));
             uniformBuffersMemory.emplace_back(std::move(bufferMem1));
@@ -109,7 +114,7 @@ namespace Engine
 
         vk::DescriptorPoolSize poolSize2{};
         poolSize2.type = vk::DescriptorType::eCombinedImageSampler;
-        poolSize2.descriptorCount =  MAX_FRAMES_IN_FLIGHT * 2;
+        poolSize2.descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
 
         std::array<vk::DescriptorPoolSize, 2> poolSize = {poolSize1, poolSize2};
 
@@ -136,11 +141,10 @@ namespace Engine
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 
-            vk::DescriptorImageInfo imageInfo {};
+            vk::DescriptorImageInfo imageInfo{};
             imageInfo.sampler = texture->getTextureSampler();
             imageInfo.imageView = texture->getTextureImageView();
-            imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; 
-
+            imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
             vk::WriteDescriptorSet descriptorWrite1{};
             descriptorWrite1.dstSet = descriptorSets[i];
@@ -159,7 +163,6 @@ namespace Engine
             descriptorWrite2.pImageInfo = &imageInfo;
 
             std::array<vk::WriteDescriptorSet, 2> writes = {descriptorWrite1, descriptorWrite2};
-
 
             device.updateDescriptorSets(writes, nullptr);
         }
@@ -221,7 +224,6 @@ namespace Engine
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachments = &attachmentInfo;
 
-
         // attach depth buffer
         vk::RenderingAttachmentInfo depthAttachmentInfo{};
         depthAttachmentInfo.imageView = *depthImageView;
@@ -277,7 +279,6 @@ namespace Engine
         imageToPresentBarrier.subresourceRange.baseArrayLayer = 0;
         imageToPresentBarrier.subresourceRange.layerCount = 1;
 
-
         std::array<vk::ImageMemoryBarrier, 1> imageToPresentBarriers = {imageToPresentBarrier};
         commandBuffer.pipelineBarrier(
             vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -328,7 +329,7 @@ namespace Engine
 
         glm::mat4 rotationMatrix = rotY1 * rotZ1 * rotX1;
         glm::mat4 translation1 = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
-        ubo1.model = translation1 * rotationMatrix;
+        ubo1.model = translation1;
 
         // CUBE 2 - position to the right, rotates differently
         UniformBufferObject ubo2{};
@@ -342,7 +343,7 @@ namespace Engine
         glm::mat4 rotationMatrix2 = rotY2 * rotZ2 * rotX2;
 
         glm::mat4 translation2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // Move right
-        ubo2.model = translation2 * rotationMatrix2;
+        ubo2.model = translation2;
 
         // Obtain view/projection from the free camera
         glm::mat4 view = camera.getViewMatrix();
@@ -355,8 +356,8 @@ namespace Engine
         ubo1.proj = proj;
         ubo2.proj = proj;
 
-        void* mapped1 = uniformBuffersMapped[currentImage * 2];
-        void* mapped2 = uniformBuffersMapped[currentImage * 2 + 1];
+        void *mapped1 = uniformBuffersMapped[currentImage * 2];
+        void *mapped2 = uniformBuffersMapped[currentImage * 2 + 1];
         memcpy(mapped1, &ubo1, sizeof(ubo1));
         memcpy(mapped2, &ubo2, sizeof(ubo2));
     }
@@ -420,7 +421,7 @@ namespace Engine
         // recreate swap chain
         swapChain.createSwapChain();
         // Update texture references to new swapchain image views
-        
+
         swapChainImageLayouts.assign(swapChain.getImages().size(), vk::ImageLayout::eUndefined);
         // recreate depth resources for new extent
         createDepthResources();
@@ -550,4 +551,38 @@ namespace Engine
         throw std::runtime_error("failed to find suitable memory type!");
     }
 
-}
+    void Renderer::loadModel()
+    {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, MODEL_PATH.c_str(), nullptr, true))
+        {
+            throw std::runtime_error(err);
+        }
+
+        for (const auto &shape : shapes)
+        {
+            for (const auto &index : shape.mesh.indices)
+            {
+                Vertex vertex{};
+                vertex.pos = {
+                    attrib.vertices[3 * index.vertex_index + 0],
+                    attrib.vertices[3 * index.vertex_index + 1],
+                    attrib.vertices[3 * index.vertex_index + 2]};
+
+                vertex.texCoord = {
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]};
+
+                vertex.color = {1.0f, 1.0f, 1.0f};
+
+                vertices.push_back(vertex);
+                indices.push_back(indices.size());
+            }
+        }
+    }
+
+} // namespace Engine

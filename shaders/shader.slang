@@ -12,6 +12,7 @@ struct UniformBuffer {
 };
 [[vk::binding(0, 0)]] ConstantBuffer<UniformBuffer> ubo;
 [[vk::binding(1, 0)]] Sampler2D texture;
+
 struct VSOutput
 {
     float4 pos : SV_Position;
